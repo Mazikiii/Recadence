@@ -179,17 +179,17 @@ module data_feeds::registry {
         // register to receive platform::forwarder reports
         platform::storage::register(publisher, cb, new_proof());
 
-        // callback for on_report_secondary function
-        let cb_secondary =
-            aptos_framework::function_info::new_function_info(
-                publisher,
-                string::utf8(b"registry"),
-                string::utf8(b"on_report_secondary")
-            );
+        // callback for on_report_secondary function - COMMENTED OUT (not in official Chainlink)
+        // let cb_secondary =
+        //     aptos_framework::function_info::new_function_info(
+        //         publisher,
+        //         string::utf8(b"registry"),
+        //         string::utf8(b"on_report_secondary")
+        //     );
         // register to receive platform_secondary::forwarder reports
-        platform_secondary::storage::register(
-            publisher, cb_secondary, new_proof_secondary()
-        );
+        // platform_secondary::storage::register(
+        //     publisher, cb_secondary, new_proof_secondary()
+        // );
 
         move_to(
             &object_signer,
@@ -226,17 +226,17 @@ module data_feeds::registry {
         let registry = borrow_global_mut<Registry>(get_state_addr());
         let object_signer = object::generate_signer_for_extending(&registry.extend_ref);
 
-        // callback for on_report_secondary function
-        let cb_secondary =
-            aptos_framework::function_info::new_function_info(
-                publisher,
-                string::utf8(b"registry"),
-                string::utf8(b"on_report_secondary")
-            );
+        // callback for on_report_secondary function - COMMENTED OUT (not in official Chainlink)
+        // let cb_secondary =
+        //     aptos_framework::function_info::new_function_info(
+        //         publisher,
+        //         string::utf8(b"registry"),
+        //         string::utf8(b"on_report_secondary")
+        //     );
         // register to receive platform_secondary::forwarder reports
-        platform_secondary::storage::register(
-            publisher, cb_secondary, new_proof_secondary()
-        );
+        // platform_secondary::storage::register(
+        //     publisher, cb_secondary, new_proof_secondary()
+        // );
 
         move_to(
             &object_signer,
@@ -421,51 +421,53 @@ module data_feeds::registry {
         option::none()
     }
 
+    // COMMENTED OUT - platform_secondary not used in official Chainlink setup
     // Callback function to be called via a @platform::forwarder contract
     // This callback will be accessed via a different 'secondary' @platform instance
-    public fun on_report_secondary<T: key>(
-        _meta: object::Object<T>
-    ): option::Option<u128> acquires Registry {
-        let registry = borrow_global_mut<Registry>(get_state_addr());
+    // public fun on_report_secondary<T: key>(
+    //     _meta: object::Object<T>
+    // ): option::Option<u128> acquires Registry {
+    //     let registry = borrow_global_mut<Registry>(get_state_addr());
 
-        // Fetch report data from the @platform::storage contract
-        // Saved previously by the platform::forwarder contract
-        let (metadata, data) =
-            platform_secondary::storage::retrieve(new_proof_secondary());
+    //     // Fetch report data from the @platform::storage contract
+    //     // Saved previously by the platform::forwarder contract
+    //     let (metadata, data) =
+    //         platform_secondary::storage::retrieve(new_proof_secondary());
 
-        let parsed_metadata =
-            platform_secondary::storage::parse_report_metadata(metadata);
+    //     let parsed_metadata =
+    //         platform_secondary::storage::parse_report_metadata(metadata);
 
-        let workflow_owner =
-            platform_secondary::storage::get_report_metadata_workflow_owner(
-                &parsed_metadata
-            );
-        assert!(
-            vector::contains(&registry.allowed_workflow_owners, &workflow_owner),
-            EUNAUTHORIZED_WORKFLOW_OWNER
-        );
+    //     let workflow_owner =
+    //         platform_secondary::storage::get_report_metadata_workflow_owner(
+    //             &parsed_metadata
+    //         );
 
-        let workflow_name =
-            platform_secondary::storage::get_report_metadata_workflow_name(
-                &parsed_metadata
-            );
-        assert!(
-            vector::is_empty(&registry.allowed_workflow_names)
-                || vector::contains(&registry.allowed_workflow_names, &workflow_name),
-            EUNAUTHORIZED_WORKFLOW_NAME
-        );
+    //     assert!(
+    //         workflow_owner == @owner,
+    //         error::permission_denied(EUNAUTHORIZED_OWNER)
+    //     );
 
-        let (feed_ids, reports) = parse_raw_report(&data);
-        vector::zip_ref(
-            &feed_ids,
-            &reports,
-            |feed_id, report| {
-                perform_update(registry, *feed_id, *report);
-            }
-        );
+    //     let workflow_name =
+    //         platform_secondary::storage::get_report_metadata_workflow_name(
+    //             &parsed_metadata
+    //         );
+    //     assert!(
+    //         vector::is_empty(&registry.allowed_workflow_names)
+    //             || vector::contains(&registry.allowed_workflow_names, &workflow_name),
+    //         EUNAUTHORIZED_WORKFLOW_NAME
+    //     );
 
-        option::none()
-    }
+    //     let (feed_ids, reports) = parse_raw_report(&data);
+    //     vector::zip_ref(
+    //         &feed_ids,
+    //         &reports,
+    //         |feed_id, report| {
+    //             perform_update(registry, *feed_id, *report);
+    //         }
+    //     );
+
+    //     option::none()
+    // }
 
     public entry fun set_workflow_config(
         authority: &signer,
@@ -830,7 +832,7 @@ module data_feeds::registry {
 
     #[test_only]
     fun set_up_test(
-        publisher: &signer, platform: &signer, platform_secondary: &signer
+        publisher: &signer, platform: &signer
     ) {
         use aptos_framework::account::{Self};
         account::create_account_for_test(signer::address_of(publisher));
@@ -838,8 +840,9 @@ module data_feeds::registry {
         platform::forwarder::init_module_for_testing(platform);
         platform::storage::init_module_for_testing(platform);
 
-        platform_secondary::forwarder::init_module_for_testing(platform_secondary);
-        platform_secondary::storage::init_module_for_testing(platform_secondary);
+        // COMMENTED OUT - platform_secondary not used in official Chainlink
+        // platform_secondary::forwarder::init_module_for_testing(platform_secondary);
+        // platform_secondary::storage::init_module_for_testing(platform_secondary);
 
         init_module(publisher);
     }
@@ -951,17 +954,15 @@ module data_feeds::registry {
         test(
             owner = @owner,
             publisher = @data_feeds,
-            platform = @platform,
-            platform_secondary = @platform_secondary
+            platform = @platform
         )
     ]
     fun test_perform_update(
         owner: &signer,
         publisher: &signer,
-        platform: &signer,
-        platform_secondary: &signer
+        platform: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         let report_data =
             x"0000000000000000000000000000000000000000000000000000000066c2e36c00000000000000000000000000000000000000000000000000000000000494a8";
@@ -993,18 +994,16 @@ module data_feeds::registry {
         test(
             owner = @owner,
             publisher = @data_feeds,
-            platform = @platform,
-            platform_secondary = @platform_secondary
+            platform = @platform
         )
     ]
     #[expected_failure(abort_code = 65540, location = data_feeds::registry)]
     fun test_perform_update_not_set(
         owner: &signer,
         publisher: &signer,
-        platform: &signer,
-        platform_secondary: &signer
+        platform: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         let report_data =
             x"0000000000000000000000000000000000000000000000000000000066c2e36c00000000000000000000000000000000000000000000000000000000000494a8";
@@ -1121,17 +1120,15 @@ module data_feeds::registry {
         test(
             owner = @owner,
             publisher = @data_feeds,
-            platform = @platform,
-            platform_secondary = @platform_secondary
+            platform = @platform
         )
     ]
     fun test_perform_update_v3(
         owner: &signer,
         publisher: &signer,
-        platform: &signer,
-        platform_secondary: &signer
+        platform: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         let report_data =
             x"0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd0000000000000000000000000000000000000000000000000000000066ed173e0000000000000000000000000000000000000000000000000000000066ed174200000000000000007fffffffffffffffffffffffffffffffffffffffffffffff00000000000000007fffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000066ee68c2000000000000000000000000000000000000000000000d808cc35e6ed670bd00000000000000000000000000000000000000000000000d808590c35425347980000000000000000000000000000000000000000000000d8093f5f989878e7c00";
@@ -1164,18 +1161,16 @@ module data_feeds::registry {
         test(
             owner = @owner,
             publisher = @data_feeds,
-            platform = @platform,
-            platform_secondary = @platform_secondary
+            platform = @platform
         )
     ]
     #[expected_failure(abort_code = 65540, location = data_feeds::registry)]
     fun test_perform_update_v3_feed_not_set(
         owner: &signer,
         publisher: &signer,
-        platform: &signer,
-        platform_secondary: &signer
+        platform: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         let report_data =
             x"0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd0000000000000000000000000000000000000000000000000000000066ed173e0000000000000000000000000000000000000000000000000000000066ed174200000000000000007fffffffffffffffffffffffffffffffffffffffffffffff00000000000000007fffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000066ee68c2000000000000000000000000000000000000000000000d808cc35e6ed670bd00000000000000000000000000000000000000000000000d808590c35425347980000000000000000000000000000000000000000000000d8093f5f989878e7c00";
@@ -1234,7 +1229,6 @@ module data_feeds::registry {
             owner = @owner,
             publisher = @data_feeds,
             platform = @platform,
-            platform_secondary = @platform_secondary,
             new_owner = @0xbeef
         )
     ]
@@ -1242,10 +1236,9 @@ module data_feeds::registry {
         owner: &signer,
         publisher: &signer,
         platform: &signer,
-        platform_secondary: &signer,
         new_owner: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         assert!(get_owner() == @owner, 1);
 
@@ -1259,7 +1252,6 @@ module data_feeds::registry {
         test(
             publisher = @data_feeds,
             platform = @platform,
-            platform_secondary = @platform_secondary,
             unknown_user = @0xbeef
         )
     ]
@@ -1267,10 +1259,9 @@ module data_feeds::registry {
     fun test_transfer_ownership_failure_not_owner(
         publisher: &signer,
         platform: &signer,
-        platform_secondary: &signer,
         unknown_user: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         assert!(get_owner() == @owner, 1);
 
@@ -1281,18 +1272,16 @@ module data_feeds::registry {
         test(
             owner = @owner,
             publisher = @data_feeds,
-            platform = @platform,
-            platform_secondary = @platform_secondary
+            platform = @platform
         )
     ]
     #[expected_failure(abort_code = 65546, location = data_feeds::registry)]
     fun test_transfer_ownership_failure_transfer_to_self(
         owner: &signer,
         publisher: &signer,
-        platform: &signer,
-        platform_secondary: &signer
+        platform: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         assert!(get_owner() == @owner, 1);
 
@@ -1304,7 +1293,6 @@ module data_feeds::registry {
             owner = @owner,
             publisher = @data_feeds,
             platform = @platform,
-            platform_secondary = @platform_secondary,
             new_owner = @0xbeef
         )
     ]
@@ -1313,10 +1301,9 @@ module data_feeds::registry {
         owner: &signer,
         publisher: &signer,
         platform: &signer,
-        platform_secondary: &signer,
         new_owner: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         assert!(get_owner() == @owner, 1);
 
@@ -1327,14 +1314,13 @@ module data_feeds::registry {
     #[
         test(
             publisher = @data_feeds,
-            platform = @platform,
-            platform_secondary = @platform_secondary
+            platform = @platform
         )
     ]
     fun test_retrieve_benchmark(
-        publisher: &signer, platform: &signer, platform_secondary: &signer
+        publisher: &signer, platform: &signer
     ) acquires Registry {
-        set_up_test(publisher, platform, platform_secondary);
+        set_up_test(publisher, platform);
 
         let feed_id = vector[1, 2, 3, 4, 5];
         set_feed_for_test(

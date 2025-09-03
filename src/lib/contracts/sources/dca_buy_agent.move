@@ -12,14 +12,14 @@ module recadence::dca_buy_agent {
     use std::signer;
     use std::vector;
     use std::option::{Self, Option};
-    use std::string::{Self, String};
+    use std::string;
     use aptos_framework::account;
     use aptos_framework::event;
     use aptos_framework::timestamp;
-    use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
-    use aptos_framework::primary_fungible_store;
+    use aptos_framework::coin;
+
+    use aptos_framework::fungible_asset::Metadata;
+
     use aptos_framework::object::{Self, Object};
     use recadence::base_agent::{Self, BaseAgent};
     use recadence::agent_registry;
@@ -183,7 +183,7 @@ module recadence::dca_buy_agent {
         initial_usdt_deposit: u64,
         stop_date: Option<u64>,
         agent_name: vector<u8>
-    ) acquires DCABuyAgentStorage {
+    ) {
         let creator_addr = signer::address_of(creator);
 
         // Validate inputs
@@ -309,7 +309,8 @@ module recadence::dca_buy_agent {
         agent.last_execution = current_time;
 
         // Update average price (weighted)
-        update_average_price(agent, agent.buy_amount_usdt, tokens_received);
+        let buy_amount = agent.buy_amount_usdt;
+        update_average_price(agent, buy_amount, tokens_received);
 
         // Increment transaction count in base agent
         base_agent::increment_transaction_count(&mut agent.base);

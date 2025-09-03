@@ -10,8 +10,8 @@
 module recadence::agent_registry {
     use std::signer;
     use std::vector;
-    use std::string::{Self, String};
-    use std::option::{Self, Option};
+    use std::string;
+    use std::option;
     use aptos_framework::event;
     use aptos_framework::timestamp;
     use aptos_framework::table::{Self, Table};
@@ -133,7 +133,7 @@ module recadence::agent_registry {
     // ================================================================================================
 
     /// Initialize the agent registry (called once by deployer)
-    public entry fun initialize_registry(admin: &signer) {
+    public entry fun initialize_registry(admin: &signer) acquires AgentRegistry {
         let admin_addr = signer::address_of(admin);
 
         if (!exists<AgentRegistry>(admin_addr)) {
@@ -151,7 +151,8 @@ module recadence::agent_registry {
             move_to(admin, registry);
 
             // Register default agent types
-            register_default_agent_types(&mut registry);
+            let registry_ref = borrow_global_mut<AgentRegistry>(admin_addr);
+            register_default_agent_types(registry_ref);
         };
     }
 

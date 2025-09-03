@@ -183,7 +183,7 @@ module recadence::dca_sell_agent {
         initial_token_deposit: u64,
         stop_date: Option<u64>,
         agent_name: vector<u8>
-    ) acquires DCASellAgentStorage {
+    ) {
         let creator_addr = signer::address_of(creator);
 
         // Validate inputs
@@ -309,7 +309,8 @@ module recadence::dca_sell_agent {
         agent.last_execution = current_time;
 
         // Update average price (weighted)
-        update_average_price(agent, agent.sell_amount_tokens, usdt_received);
+        let sell_amount = agent.sell_amount_tokens;
+        update_average_price(agent, sell_amount, usdt_received);
 
         // Increment transaction count in base agent
         base_agent::increment_transaction_count(&mut agent.base);

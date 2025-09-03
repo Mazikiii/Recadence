@@ -12,12 +12,10 @@
 module recadence::base_agent {
     use std::signer;
     use std::vector;
-    use std::option::{Self, Option};
-    use aptos_framework::account;
+    use std::option;
     use aptos_framework::event;
     use aptos_framework::timestamp;
-    use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::coin;
 
     // ================================================================================================
     // Error Codes
