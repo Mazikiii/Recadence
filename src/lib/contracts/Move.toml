@@ -1,15 +1,31 @@
 [package]
-name = "recedence_contracts"
+name = "recadence_contracts"
 version = "1.0.0"
-authors = []
+authors = ["Recadence Team"]
 
 [addresses]
+# Your account address (will be updated after deployment)
+recadence = "849ab11d0816c9b90336ab226687a5f53754eef1ab133e549f33db45513c73d2"
+
+# Chainlink addresses on Aptos testnet
+data_feeds = "0xf1099f135ddddad1c065203431be328a408b0ca452ada70374ce26bd2b32fdd3"
+platform = "0x516e771e1b4a903afe74c27d057c65849ecc1383782f6642d7ff21425f4f9c99"
+
+# Standard addresses
+move_stdlib = "0x1"
+aptos_std = "0x1"
+aptos_framework = "0x1"
 
 [dev-addresses]
+# Development addresses for testing
+recadence = "849ab11d0816c9b90336ab226687a5f53754eef1ab133e549f33db45513c73d2"
 
-[dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-framework.git"
-rev = "mainnet"
-subdir = "aptos-framework"
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", rev = "mainnet", subdir = "aptos-framework" }
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", rev = "mainnet", subdir = "aptos-stdlib" }
+MoveStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", rev = "mainnet", subdir = "move-stdlib" }
+ChainlinkPlatform = { local = "./ChainlinkPlatform" }
+ChainlinkDataFeeds = { local = "./ChainlinkDataFeeds" }
 
 [dev-dependencies]
+# Development dependencies for testing

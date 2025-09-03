@@ -1,0 +1,653 @@
+Autonomous Trading Agents Platform on Aptos**
+*A comprehensive platform that manages **autonomous trading agents** deployed as individual smart contracts on Aptos blockchain. Users create funded agents that execute predefined trading strategies with **instant, millisecond-fast execution**, featuring native Aptos token support and a professional wallet interface.*
+
+---
+
+## **Core Value Proposition**
+
+- **Lightning-fast trading**: Agents execute trades in **<250ms** leveraging Aptos Block-STM parallel execution
+- **Native Aptos ecosystem**: Support for APT, USDT, USDC, WETH, WBTC with instant execution
+- **Individual smart contracts**: Each agent is a separate autonomous contract with immutable security
+- **Smart gas sponsorship**: First 10 agents per user are gas-free, promoting accessibility while ensuring sustainability
+- **Professional wallet interface**: Comprehensive token display including wrapped assets (WBTC, WETH)
+- **AI-powered setup**: Configure agents through intelligent conversation (optional advanced feature)
+
+---
+
+## **Platform Limits & Gas Model**
+
+### **User Agent Limits**
+- **Maximum active agents per user**: 10 agents
+- **Gas sponsorship**: First 10 agents per user get full gas sponsorship
+- **Post-limit behavior**: Users pay standard Aptos gas fees for additional operations
+- **Agent lifecycle**: Users must delete inactive agents to create new ones within the 10-agent limit
+
+### **Gas Sponsorship Strategy**
+```/dev/null/gas_model.txt#L1-12
+Agents 1-10 per user: FREE ✅
+- Agent creation: Sponsored
+- All trading operations: Sponsored
+- Pause/resume: Sponsored
+- Withdrawals: Sponsored
+
+Beyond 10 agents: USER PAYS 💰
+- Standard Aptos gas fees apply
+- Prevents platform gas cost explosion
+- Maintains accessibility for new users
+```
+
+---
+
+## **Ultra-High Performance Architecture**
+
+### **System Overview**
+```
+Native Aptos Deposits → Platform Custodial Wallet → Individual Agent Contracts (Max 10/user)
+                                    ↓
+                        Geomi.dev (Indexing + Limited Gas Station) → Frontend (Real-time)
+                                    ↓
+            Chainlink Oracle + Professional Keeper System → <250ms Execution
+```
+
+### **Core Infrastructure Components**
+
+#### **1. Native Aptos Asset Support**
+
+**Supported Assets** (Testnet):
+- **APT** (Native Aptos token)
+- **USDT** (Tether on Aptos)
+- **USDC** (USD Coin on Aptos)
+- **WETH** (Wrapped Ethereum)
+- **WBTC** (Wrapped Bitcoin)
+
+**Direct Deposit Process**:
+1. Users deposit directly to Aptos testnet platform wallet
+2. Instant balance updates (no bridge delays)
+3. Immediate agent creation and funding (within 10-agent limit)
+4. Native Aptos speed for all operations
+
+#### **2. Professional Keeper Infrastructure** *(Testnet Optimized)*
+
+**Centralized Keeper System**:
+- Platform runs dedicated keeper services monitoring all agent contracts
+- Keepers check agent conditions every 250ms (each Aptos block)
+- When conditions are met, keepers call agent contracts to execute trades
+- Keeper costs covered by 0.5% platform trading fees (testnet simulation)
+
+**Gas Cost Management**:
+- **Sponsored operations**: First 10 agents per user
+- **User-paid operations**: Beyond 10 agents (standard Aptos testnet gas)
+- **Keeper operations**: Platform-funded (independent of user limits)
+
+#### **3. Geomi.dev Infrastructure** *(Testnet Configuration)*
+
+**Testnet indexing setup** with real-time event tracking including AgentCreated, TradeExecuted, AgentPaused, and FundsWithdrawn events. **Limited Gas Station configuration** provides sponsorship for first 10 agents per user with 1000 rate limit per minute.
+
+**Real-time monitoring** includes price feeds updated every block, instant agent triggers, immediate execution alerts, and user agent count tracking.
+
+#### **4. Optimized Oracle Strategy** *(Testnet Implementation)*
+
+**Primary Price Source**: Chainlink testnet feeds
+**Secondary Validation**: Direct DEX queries from testnet Thala and PancakeSwap
+**Cost-Effective Implementation**: Batch price updates for supported assets every 5 minutes
+
+**Supported Trading Pairs** (Testnet):
+- **WETH ↔ USDT**
+- **WBTC ↔ USDT**
+- **APT ↔ USDT**
+- **USDC ↔ USDT**
+
+---
+
+## **Agent Types** *(4 Individual Contract Templates)*
+
+### **User Limits Applied to All Agent Types**
+- **Maximum 10 active agents** per user across all types
+- **Gas sponsorship** for operations on first 10 agents
+- **Agent creation restriction** when user reaches 10 active agents
+
+### **1. DCA Buy Agent Contract**
+**Purpose**: Continuously buy target token with USDT at set intervals
+
+**Supported Assets**: APT, WETH, WBTC
+
+**Configuration**:
+- Target token (APT, WETH, WBTC)
+- Buy amount per execution ($25, $50, $100, etc.)
+- Frequency in hours (24h = daily, 168h = weekly, custom)
+- Optional stop date and agent name
+
+**Gas Model**:
+- **Creation**: Free for first 10 agents per user
+- **Execution**: Free for first 10 agents, user pays gas beyond limit
+- **Management**: Free pause/resume for first 10 agents
+
+### **2. DCA Sell Agent Contract**
+**Purpose**: Continuously sell specific token for USDT at set intervals
+
+**Supported Assets**: APT, WETH, WBTC
+
+**Configuration**:
+- Token to sell (WETH, WBTC, APT)
+- Sell amount (USDT equivalent or token amount)
+- Frequency in hours, optional stop date, agent name
+
+**Same gas model and limits as DCA Buy Agent**
+
+### **3. Percentage Buy Agent Contract**
+**Purpose**: Buy when token price moves by specified percentage from last transaction
+
+**Supported Assets**: APT, WETH, WBTC
+
+**Configuration**:
+- Target token (APT, WETH, WBTC)
+- Buy amount per trigger ($100, $200, etc.)
+- **Trend Selection**:
+  - **DOWN ↓** (Default) - Buy when price drops by X% (buy the dip)
+  - **UP ↑** - Buy when price rises by X% (buy momentum)
+- Percentage threshold (5%, 10%, 15%, etc.)
+- Optional stop date and agent name
+
+**Execution Logic**:
+- **Immediate first purchase** upon funding (establishes reference price)
+- **Continuous monitoring**: Keepers track `current_price vs last_transaction_price` every block
+- **Trend-based triggers**:
+  - **DOWN trend**: Executes when `price_drop >= trigger_percentage`
+  - **UP trend**: Executes when `price_rise >= trigger_percentage`
+- **Reference price update**: Updates to current price after each purchase
+- **Auto-pause condition**: When `remaining_funds < (buy_amount + gas_buffer)`
+
+**User Interface**:
+```/dev/null/percentage_buy_ui.txt#L1-8
+Trend Selection (Default: DOWN):
+🔽 DOWN - "Buy when WETH drops by 10%" (Default)
+🔼 UP   - "Buy when WETH rises by 10%"
+
+Examples:
+DOWN + 10%: Buy WETH when it drops 10% from last purchase
+UP + 5%: Buy WETH when it rises 5% from last purchase
+```
+
+### **4. Percentage Sell Agent Contract**
+**Purpose**: Sell when token price moves by specified percentage from last transaction
+
+**Configuration**: Token to sell, sell amount, percentage thresholds, optional stop date (no trend selection - sells work differently)
+
+**Execution Logic**: Standard percentage-based selling without trend selection
+
+---
+
+## **User Experience & Agent Management**
+
+### **Agent Limit Interface**
+```/dev/null/user_interface.txt#L1-10
+Dashboard shows:
+✅ "Active Agents: 7/10"
+✅ "Gas Sponsorship: Active" (for agents 1-10)
+❌ "Agent Limit Reached" (when at 10)
+
+Create New Agent Button:
+✅ Enabled when < 10 agents
+❌ Disabled when = 10 agents
+💡 "Delete inactive agents to create new ones"
+```
+
+### **Percentage Buy Agent Setup Flow**
+```/dev/null/percentage_setup.txt#L1-10
+Step 1: Select token (WETH, WBTC, APT)
+Step 2: Set buy amount ($50, $100, etc.)
+Step 3: Choose trend direction:
+        🔽 DOWN (Default) - "Buy the dip"
+        🔼 UP - "Buy momentum"
+Step 4: Set percentage (5%, 10%, 15%)
+Step 5: Optional stop date and agent name
+```
+
+---
+
+## **AI-Powered Agent Setup** *(Advanced Feature)*
+
+### **Intelligent Configuration for Percentage Buy Agents**
+
+**Example AI Chat Flows**:
+
+**Scenario 1 (Default DOWN trend)**:
+User: "I want to buy WETH when it drops"
+AI: "I'll set up a percentage buy agent with DOWN trend (default). When WETH drops by what percentage should it buy? Common options: 5%, 10%, 15%"
+
+**Scenario 2 (UP trend)**:
+User: "I want to buy WETH when it's pumping"
+AI: "I'll set up a percentage buy agent with UP trend for momentum buying. When WETH rises by what percentage should it buy?"
+
+**Smart Defaults**:
+- **Trend**: Always defaults to DOWN (buy the dip)
+- **Percentage**: Suggests 10% as balanced option
+- **Amount**: Based on user's available balance
+
+---
+
+## **Testnet Deployment Strategy**
+
+### **Phase 1: Testnet Launch** *(Prove Concept)*
+
+**Week 1-2: Infrastructure Setup**
+- Deploy on Aptos testnet with limited gas sponsorship
+- Implement percentage buy agent with trend selection
+- Set up Geomi.dev testnet indexing
+- Configure Chainlink testnet price feeds
+- Implement 10-agent limit per user
+
+**Week 3-4: User Testing**
+- Test percentage buy agents with both UP and DOWN trends
+- Validate trend-based execution logic
+- Test gas sponsorship boundaries
+- Stress test with multiple users hitting 10-agent limits
+
+**Week 5-6: Optimization**
+- Fine-tune trend-based trigger algorithms
+- Optimize gas costs and keeper efficiency
+- Prepare for mainnet migration
+
+### **Phase 2: Mainnet Migration** *(After Successful Testnet)*
+
+**Pre-migration requirements**:
+- Successful testing of both trend directions
+- Proven trend-based execution accuracy
+- Validated user limit enforcement
+- Stress tested keeper infrastructure
+
+---
+
+## **Success Metrics**
+
+### **Testnet Success Criteria**
+- **100+ beta users** creating agents within limits
+- **200+ percentage buy agents** testing both UP and DOWN trends
+- **99%+ execution accuracy** for trend-based triggers
+- **<250ms average execution time** maintained for all agent types
+- **Sustainable gas cost model** validated
+
+### **Percentage Buy Agent Specific Metrics**
+- **DOWN trend adoption**: 80%+ of percentage buy agents (validates default)
+- **UP trend usage**: 20%+ adoption (proves feature value)
+- **Trigger accuracy**: 99%+ correct trend direction execution
+- **User satisfaction**: Positive feedback on trend selection UX
+
+---
+
+## **Risk Management**
+
+### **Trend-Based Execution Risks**
+- **Price oracle accuracy**: Ensure reliable price feeds for trend detection
+- **Execution timing**: Prevent false triggers during price volatility
+- **User education**: Clear explanation of UP vs DOWN trend differences
+
+
+---
+MVP Flow
+
+1. **User onboards with agent limits**: User connects Aptos wallet and deposits native tokens (APT, USDT, USDC, WETH, WBTC) into platform custodial wallet
+2. **Agent creation within limits**: User selects agent type (DCA Buy/Sell or Percentage Buy/Sell) and configures parameters - limited to 10 active agents per user
+3. **Smart contract deployment**: Platform deploys individual smart contract for that specific agent with user's configuration and gas sponsorship tracking
+4. **Autonomous execution**: Agent contract executes trades automatically based on configured strategy via direct Aptos DEX integration with keeper-based monitoring
+5. **Real-time monitoring**: User monitors agent performance through dashboard showing execution history, gas sponsorship status, and agent count (X/10)
+6. **Lifecycle management**: User can pause agent or withdraw remaining funds back to original wallet - must delete agents to create new ones when at 10-agent limit
+
+---
+
+## Launch Features (Testnet MVP)
+
+### Lightning DCA Buy Agent
+
+_Automatically purchases target tokens (APT, WETH, WBTC) at specified intervals with sub-250ms execution speed using native Aptos DEX routing._
+
+- Deploy individual smart contract per agent with creator-only controls
+- Execute scheduled purchases using direct DEX integration (LiquidSwap, Thala, PancakeSwap)
+- Real-time balance tracking and execution history
+- Automatic pause when insufficient funds for next purchase + gas buffer
+- **Gas sponsorship**: Free for first 10 agents per user, user pays beyond limit
+
+#### Tech Involved
+
+- Aptos Move smart contracts with 10-agent limit enforcement
+- Geomi.dev for real-time indexing and limited gas sponsorship
+- Direct Aptos DEX API integration (testnet environment)
+- Block-STM parallel execution optimization
+- Chainlink testnet price feeds for supported assets
+
+#### Main Requirements
+
+- Sub-250ms swap execution guarantee on Aptos testnet
+- Smart gas sponsorship for first 10 agents per user
+- Secure fund isolation per agent contract
+- Creator-only withdrawal controls with immutable security
+- Agent count tracking and limit enforcement
+
+### Lightning DCA Sell Agent
+
+_Systematically sells specified tokens (APT, WETH, WBTC) for USDT at configured intervals with instant execution._
+
+- Mirror DCA Buy functionality for selling operations
+- Token balance verification before each execution
+- Automatic conversion to USDT equivalent calculations
+- Smart pause logic based on remaining sellable tokens
+- **Same 10-agent limit and gas sponsorship model**
+
+#### Tech Involved
+
+- Same core tech stack as DCA Buy Agent with testnet configuration
+- Enhanced token balance monitoring for supported assets
+- Multi-token support for available wrapped assets (WETH, WBTC)
+
+#### Main Requirements
+
+- Support for native Aptos and available wrapped tokens only
+- Accurate token-to-USDT conversion calculations
+- Seamless integration with agent limit enforcement
+- Testnet-appropriate execution and monitoring
+
+### Percentage-Based Trading Agents
+
+_Buy or sell tokens when price moves by specified percentage thresholds, with trend selection for buy agents._
+
+#### Percentage Buy Agent (With Trend Selection)
+- **Trend selection**: DOWN ↓ (default - buy the dip) or UP ↑ (buy momentum)
+- Real-time price monitoring every 250ms via keeper system
+- Instant trigger detection and execution within same block
+- Reference price updates after each successful trade
+- **Default behavior**: DOWN trend for "buy the dip" strategy
+
+#### Percentage Sell Agent (Standard)
+- Standard percentage-based selling without trend selection
+- Executes when token price moves by specified percentage
+- USDT accumulation and balance tracking
+
+#### Tech Involved
+
+- Real-time price feed integration from Chainlink testnet
+- Professional keeper system monitoring all agents
+- Advanced Move contracts with trend-based logic for buy agents
+- Block-level monitoring and trigger system
+- Agent limit enforcement across all percentage agents
+
+#### Main Requirements
+
+- Continuous price monitoring for supported assets (APT, WETH, WBTC)
+- Trend selection UI with clear DOWN/UP indicators for buy agents
+- Default DOWN trend with user option to select UP
+- Accurate percentage calculations against last transaction price
+- Integration with 10-agent limit and gas sponsorship model
+
+### Professional Wallet Interface
+
+_Clean interface displaying supported Aptos tokens with real-time balance updates and agent management._
+
+- **Agent limit tracking**: Clear display of "Active Agents: X/10"
+- **Gas sponsorship status**: Visual indicators for sponsored vs user-paid agents
+- Universal token support for available assets (APT, USDT, USDC, WETH, WBTC)
+- Real-time balance updates within 250ms block finality
+- **Agent management**: Create, pause, delete agents with limit enforcement
+
+#### Tech Involved
+
+- React/TypeScript frontend with Tailwind CSS
+- WebSocket connections for real-time updates on testnet
+- Aptos wallet adapter integration (testnet configuration)
+- Custom token registry for supported assets
+- Agent count and gas status tracking
+
+#### Main Requirements
+
+- Support for current Aptos ecosystem tokens (5 supported assets)
+- Real-time synchronization with testnet blockchain state
+- Agent limit enforcement in UI (disable creation at 10 agents)
+- Gas sponsorship visual indicators
+- Intuitive testnet trading interface
+
+### Testnet-Specific Features
+
+#### Gas Sponsorship Management
+- **First 10 agents**: Complete gas sponsorship via Geomi Gas Station
+- **Beyond 10 agents**: User pays standard Aptos testnet gas fees
+- **Visual indicators**: Clear UI showing gas status per agent
+- **Cost tracking**: Monitor sponsorship sustainability for mainnet planning
+
+#### Agent Limit Enforcement
+- **Hard limit**: Maximum 10 active agents per user
+- **Smart UI**: Disable creation when limit reached
+- **Management prompts**: Guide users to delete inactive agents
+- **Limit tracking**: Real-time display of agent count
+
+---
+
+## Future Features (Post-Testnet Success)
+
+### Mainnet Migration
+- **Proven gas model**: Deploy sustainable gas sponsorship on mainnet
+- **Validated limits**: Maintain 10-agent limit based on testnet results
+- **Revenue integration**: Implement 0.5% trading fee collection
+- **Scale optimization**: Optimize keeper system for higher volume
+
+### Ecosystem Expansion (When Available)
+- **Additional wrapped tokens**: Support new bridged assets as ecosystem grows
+- **Cross-chain integration**: Add Kana Labs when more tokens available
+- **Synthetic exposure**: V2 with price tracking for assets not on Aptos
+
+### Advanced Trading Strategies
+- **Grid trading agents** within 10-agent limit
+- **Advanced percentage strategies** with multiple trigger conditions
+- **Portfolio rebalancing agents** across supported assets
+
+#### Tech Involved
+
+- Advanced Move contract templates within current ecosystem
+- Enhanced keeper system for complex strategies
+- Multi-asset portfolio management logic
+
+#### Main Requirements
+
+- Complex strategy logic while maintaining speed guarantees and agent limits
+- Advanced backtesting using testnet data
+- Risk management within gas sponsorship model
+
+---
+
+## Testnet Success Metrics
+
+### User Adoption
+- **100+ beta users** testing agent creation within limits
+- **500+ total agents deployed** across all supported asset types
+- **Agent limit validation**: Users successfully managing 10-agent limits
+
+### Technical Performance
+- **<250ms execution** maintained across all agent types
+- **99%+ keeper reliability** for agent monitoring and execution
+- **Gas cost sustainability** proven within sponsorship model
+
+### Feature Validation
+- **Trend selection adoption**: 80%+ DOWN trend, 20%+ UP trend usage
+- **Asset distribution**: Balanced usage across APT, WETH, WBTC pairs
+- **Agent type preferences**: Data on DCA vs Percentage agent popularity
+
+---
+
+**This refined MVP focuses on what works perfectly within current Aptos ecosystem limitations while preparing for future expansion.** 🚀
+
+---
+STREAMLINED AGENT DISTRIBUTION:**
+
+### **🔵 Backend Agent (4 major sprints)**
+- **Week 1**: Complete smart contract suite (all 4 agent types)
+- **Week 2**: Infrastructure layer (keeper + DEX + Geomi.dev)
+- **Week 3**: Production optimization & monitoring
+- **Week 4**: Testnet deployment & final validation
+
+### **🟠 QA & Testing Agent (3 parallel sprints)**
+- **Week 1**: Contract testing (parallel with development)
+- **Week 2**: Infrastructure testing (parallel with development)
+- **Week 3**: End-to-end integration testing
+
+### **🔴 Security Agent (3 parallel sprints)**
+- **Week 1**: Contract security audit (parallel with development)
+- **Week 2**: Infrastructure security audit (parallel with development)
+- **Week 4**: Final security certification
+
+## **AGGRESSIVE 4-WEEK TIMELINE:**
+
+### **Week 1** (Days 1-7): Foundation Complete
+✅ All 4 agent contracts fully developed
+✅ 10-agent limits and gas sponsorship implemented
+✅ Complete testing suite with 95% coverage
+✅ Security audit and vulnerability fixes
+
+### **Week 2** (Days 8-14): Infrastructure Complete
+✅ Professional keeper system operational
+✅ All DEX integrations with route optimization
+✅ Geomi.dev real-time indexing working
+✅ Infrastructure performance and security validation
+
+### **Week 3** (Days 15-21): Production Ready
+✅ End-to-end integration testing complete
+✅ Production optimization and monitoring
+✅ System performance validated under load
+✅ All operational procedures documented
+
+### **Week 4** (Days 22-28): Deployed & Certified
+✅ Complete testnet deployment operational
+✅ Final security certification approved
+✅ All documentation complete
+✅ System ready for mainnet migration
+
+## **KEY FEATURES DELIVERED:**
+✅ All 4 agent types (DCA Buy/Sell, Percentage Buy/Sell with trend selection)
+✅ 10-agent limit with gas sponsorship for first 10 agents
+✅ Sub-250ms execution guarantee via professional keeper system
+✅ Native Aptos token support (APT, USDT, USDC, WETH, WBTC)
+✅ Real-time indexing and monitoring via Geomi.dev
+✅ Complete testnet deployment with production-grade infrastructure
+
+**With your agents helping, this aggressive 4-week timeline will deliver a complete, production-ready backend system!** 🔥
+
+The tasks are designed for maximum parallelization - your agents can work simultaneously on different components while maintaining dependencies and quality standards.
+
+EXECUTION ORDER & DEPENDENCIES**
+
+### **Week 1: Foundation Phase**
+
+#### **Day 1-2: Sequential Start**
+1. **🔵 Backend Agent STARTS FIRST** (MAZ-24)
+   - Setup development environment
+   - Design base agent architecture
+   - **No one can start until this is done**
+
+#### **Day 3-7: Parallel Development**
+2. **🔵 Backend Agent CONTINUES** (MAZ-24)
+   - Develops all 4 smart contracts simultaneously
+   - **Delivers working contracts daily for immediate testing**
+
+3. **🟠 QA Agent STARTS Day 5** (MAZ-25) - **PARALLEL**
+   - Writes tests for completed contracts
+   - **Tests each contract as Backend delivers them**
+
+4. **🔴 Security Agent STARTS Day 4** (MAZ-26) - **PARALLEL**
+   - Audits contracts as Backend completes them
+   - **Provides immediate feedback for fixes**
+
+### **Week 2: Infrastructure Phase**
+
+#### **Day 8-14: Parallel Infrastructure**
+1. **🔵 Backend Agent** (MAZ-27) - **CONTINUES**
+   - Builds keeper system + DEX integration + Geomi.dev
+   - **Delivers components incrementally**
+
+2. **🟠 QA Agent** (MAZ-28) - **PARALLEL**
+   - Tests infrastructure as Backend builds it
+   - **Performance testing of each component**
+
+3. **🔴 Security Agent** (MAZ-29) - **PARALLEL**
+   - Security audit of infrastructure components
+   - **Immediate security feedback**
+
+### **Week 3: Integration & Production**
+
+#### **Day 15-21: System Integration**
+1. **🟠 QA Agent LEADS** (MAZ-30) - **PRIMARY**
+   - End-to-end integration testing
+   - **Validates complete system**
+
+2. **🔵 Backend Agent** (MAZ-31) - **PARALLEL**
+   - Production optimization based on QA findings
+   - **Implements monitoring and documentation**
+
+### **Week 4: Deployment & Certification**
+
+#### **Day 22-28: Final Deployment**
+1. **🔵 Backend Agent** (MAZ-32) - **PRIMARY**
+   - Testnet deployment and final validation
+   - **System goes live**
+
+2. **🔴 Security Agent** (MAZ-33) - **PARALLEL**
+   - Final security certification on live system
+   - **Security approval for production**
+
+## **CRITICAL SUCCESS PATTERN:**
+
+### **Test-Driven Development Approach:**
+```
+Backend develops → QA tests immediately → Security audits parallel
+         ↓                ↓                       ↓
+   Daily delivery → Immediate feedback → Instant fixes
+```
+
+### **Daily Workflow:**
+```
+Day N:
+09:00 - Backend delivers component X
+10:00 - QA starts testing component X
+11:00 - Security starts auditing component X
+15:00 - QA reports test results
+16:00 - Security reports security findings
+17:00 - Backend fixes issues same day
+```
+
+## **WHO STARTS WHEN:**
+
+### **🔵 Backend Agent - ALWAYS STARTS FIRST**
+- **Day 1**: Environment setup (blocking for everyone)
+- **Day 3**: Smart contract development (enables testing)
+- **Day 8**: Infrastructure development (enables infrastructure testing)
+
+### **🟠 QA Agent - STARTS WHEN THERE'S CODE**
+- **Day 5**: When first contracts are ready
+- **Day 11**: When infrastructure components are ready
+- **Day 15**: LEADS integration testing
+
+### **🔴 Security Agent - STARTS WITH MEANINGFUL CODE**
+- **Day 4**: When base contracts have substance
+- **Day 11**: When infrastructure has security-relevant components
+- **Day 22**: LEADS final certification
+
+## **DEPENDENCY CHAIN:**
+
+```
+Week 1: Backend → QA → Security (sequential start, parallel execution)
+Week 2: All parallel (Backend delivers, QA tests, Security audits)
+Week 3: QA leads, Backend supports, Security monitors
+Week 4: Backend deploys, Security certifies
+```
+
+## **CRITICAL SUCCESS FACTORS:**
+
+1. **Backend Agent sets the pace** - everyone else follows their delivery
+2. **QA Agent provides immediate feedback** - enables same-day fixes
+3. **Security Agent prevents technical debt** - catches issues early
+4. **Daily integration** - no component waits more than 24 hours for testing
+
+## **START SEQUENCE:**
+
+**TODAY**: Backend Agent starts environment setup
+**Day 3**: QA Agent prepares testing framework
+**Day 4**: Security Agent prepares audit tools
+**Day 5**: All agents working in parallel with daily feedback cycles
+
+**This approach ensures maximum velocity while maintaining quality - your agents work as a high-performance team with continuous integration and immediate feedback loops!** 🚀
