@@ -10,7 +10,7 @@ recadence = "_"
 # Chainlink addresses on Aptos testnet
 data_feeds = "0xf1099f135ddddad1c065203431be328a408b0ca452ada70374ce26bd2b32fdd3"
 platform = "0x516e771e1b4a903afe74c27d057c65849ecc1383782f6642d7ff21425f4f9c99"
-owner = "_"
+owner = "0x2a5eae7b6f80cecdd4e15ce20b2d3cedfa801db8ac758ed37fe2952fc02d1144"
 
 # Standard addresses
 move_stdlib = "0x1"

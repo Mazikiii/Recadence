@@ -5,12 +5,10 @@ authors = []
 
 [addresses]
 data_feeds = "_"
-owner = "_"
 platform = "_"
 
 [dev-addresses]
 data_feeds = "0x200"
-owner = "0xfeed"
 platform = "0xbaba"
 
 [dependencies]

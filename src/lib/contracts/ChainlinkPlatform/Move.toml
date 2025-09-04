@@ -5,11 +5,9 @@ authors = []
 
 [addresses]
 platform = "_"
-owner = "_"
 
 [dev-addresses]
 platform = "0x300"
-owner = "0xbabe"
 
 [dependencies]
 AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "mainnet", subdir = "aptos-move/framework/aptos-framework" }
