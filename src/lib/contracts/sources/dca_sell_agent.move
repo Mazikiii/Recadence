@@ -678,7 +678,7 @@ module recadence::dca_sell_agent {
         timing_unit: u8,
         timing_value: u64,
         initial_token_deposit: u64
-    ) acquires DCASellAgentStorage {
+    ) {
         create_dca_sell_agent(
             creator,
             source_token,

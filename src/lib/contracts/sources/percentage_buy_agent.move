@@ -591,11 +591,11 @@ module recadence::percentage_buy_agent {
     public fun test_create_percentage_buy_agent(
         creator: &signer,
         target_token: Object<Metadata>,
-        buy_amount_usdt: u64,
         percentage_threshold: u64,
+        buy_amount_usdt: u64,
         trend_direction: u8,
         initial_usdt_deposit: u64
-    ) acquires PercentageBuyAgentStorage {
+    ) {
         create_percentage_buy_agent(
             creator,
             target_token,

@@ -664,7 +664,7 @@ module recadence::dca_buy_agent {
         timing_unit: u8,
         timing_value: u64,
         initial_usdt_deposit: u64
-    ) acquires DCABuyAgentStorage {
+    ) {
         create_dca_buy_agent(
             creator,
             target_token,

@@ -12,6 +12,7 @@
 module recadence::base_agent {
     use std::signer;
     use std::vector;
+    use std::bcs;
     use aptos_framework::event;
     use aptos_framework::timestamp;
     use aptos_framework::coin;
@@ -219,8 +220,9 @@ module recadence::base_agent {
 
         let current_time = timestamp::now_seconds();
 
-        // Create resource account for this agent
-        let (resource_signer, signer_cap) = account::create_resource_account(creator, vector::empty<u8>());
+        // Create resource account for this agent with unique seed based on agent ID
+        let seed = bcs::to_bytes(&agent_id);
+        let (resource_signer, signer_cap) = account::create_resource_account(creator, seed);
         let resource_addr = signer::address_of(&resource_signer);
 
         // Create base agent with resource account info
@@ -564,7 +566,7 @@ module recadence::base_agent {
     // ================================================================================================
 
     #[test_only]
-    public fun test_create_base_agent(creator: &signer, name: vector<u8>): BaseAgent
+    public fun test_create_base_agent(creator: &signer, name: vector<u8>): (BaseAgent, signer)
         acquires UserAgentRegistry, PlatformRegistry {
         create_base_agent(creator, name, b"test_agent")
     }

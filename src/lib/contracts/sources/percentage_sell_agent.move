@@ -572,7 +572,7 @@ module recadence::percentage_sell_agent {
         sell_amount_tokens: u64,
         percentage_threshold: u64,
         initial_token_deposit: u64
-    ) acquires PercentageSellAgentStorage {
+    ) {
         create_percentage_sell_agent(
             creator,
             source_token,
