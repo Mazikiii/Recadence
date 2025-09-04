@@ -94,8 +94,8 @@ module recadence::dca_sell_agent {
 
     /// DCA Sell Agent configuration
     struct DCASellAgent has key, store, copy, drop {
-        /// Base agent data
-        base: BaseAgent,
+        /// Agent ID reference
+        agent_id: u64,
         /// Source token to sell (APT, WETH, WBTC, USDC)
         source_token: Object<Metadata>,
         /// Amount of source token to sell per execution
@@ -192,8 +192,8 @@ module recadence::dca_sell_agent {
         assert!(sell_amount_tokens > 0, E_INSUFFICIENT_TOKEN_BALANCE);
         assert!(initial_token_deposit >= sell_amount_tokens, E_INSUFFICIENT_TOKEN_BALANCE);
 
-        // Create base agent
-        let base_agent = base_agent::create_base_agent(
+        // Create base agent (now returns base_agent and resource_signer)
+        let (base_agent, resource_signer) = base_agent::create_base_agent(
             creator,
             agent_name,
             b"dca_sell"
@@ -207,8 +207,11 @@ module recadence::dca_sell_agent {
             value: timing_value,
         };
 
+        let agent_id = base_agent::get_agent_id(&base_agent);
+        let resource_addr = base_agent::get_resource_address(&base_agent);
+
         let dca_agent = DCASellAgent {
-            base: base_agent,
+            agent_id,
             source_token,
             sell_amount_tokens,
             timing: timing_config,
@@ -221,27 +224,27 @@ module recadence::dca_sell_agent {
             execution_count: 0,
         };
 
-        let agent_id = base_agent::get_agent_id(&base_agent);
-
-        // Create resource account for this agent
-        let (resource_signer, resource_cap) = account::create_resource_account(creator, vector::empty());
-        let resource_addr = signer::address_of(&resource_signer);
-
-        // Store agent in resource account
-        move_to(&resource_signer, DCASellAgentStorage {
+        // Store the agent
+        let agent_storage = DCASellAgentStorage {
             agent: dca_agent,
-        });
+        };
+
+        // Store base agent in resource account first
+        base_agent::store_base_agent(&resource_signer, base_agent);
+
+        // Then store agent storage
+        move_to(&resource_signer, agent_storage);
 
         // Transfer initial tokens to agent
         transfer_tokens_to_agent(creator, resource_addr, source_token, initial_token_deposit);
 
         // Register agent in global registry
+        // Register with platform
         agent_registry::register_agent(
             creator,
             b"dca_sell",
             agent_name,
-            resource_addr,
-            &base_agent
+            resource_addr
         );
 
         // Emit creation event
@@ -270,7 +273,8 @@ module recadence::dca_sell_agent {
         let agent = &mut storage.agent;
 
         // Verify agent is active
-        assert!(base_agent::is_active(&agent.base), E_AGENT_NOT_ACTIVE);
+        let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+        assert!(base_agent::is_agent_active(resource_addr), E_AGENT_NOT_ACTIVE);
 
         let current_time = timestamp::now_seconds();
 
@@ -313,12 +317,16 @@ module recadence::dca_sell_agent {
         update_average_price(agent, sell_amount, usdt_received);
 
         // Increment transaction count in base agent
-        base_agent::increment_transaction_count(&mut agent.base);
+        let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+        base_agent::increment_transaction_count_by_addr(resource_addr);
 
         // Update registry transaction count
         agent_registry::update_transaction_count(
-            base_agent::get_agent_id(&agent.base),
-            base_agent::get_total_transactions(&agent.base)
+            agent.agent_id,
+            {
+                let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+                base_agent::get_total_transactions_by_addr(resource_addr)
+            }
         );
 
         // Emit execution event
@@ -327,8 +335,11 @@ module recadence::dca_sell_agent {
         } else { 0 };
 
         event::emit(DCASellExecutedEvent {
-            agent_id: base_agent::get_agent_id(&agent.base),
-            creator: base_agent::get_creator(&agent.base),
+            agent_id: agent.agent_id,
+            creator: {
+                let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+                base_agent::get_agent_creator(resource_addr)
+            },
             source_token: object::object_address(&agent.source_token),
             tokens_sold: agent.sell_amount_tokens,
             usdt_received,
@@ -350,11 +361,12 @@ module recadence::dca_sell_agent {
         let storage = borrow_global_mut<DCASellAgentStorage>(agent_resource_addr);
         let agent = &mut storage.agent;
 
-        base_agent::pause_agent(&mut agent.base, creator);
+        let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+        base_agent::pause_agent_by_addr(resource_addr, creator);
 
         // Update registry status
         agent_registry::update_agent_status(
-            base_agent::get_agent_id(&agent.base),
+            agent.agent_id,
             creator,
             false
         );
@@ -368,11 +380,12 @@ module recadence::dca_sell_agent {
         let storage = borrow_global_mut<DCASellAgentStorage>(agent_resource_addr);
         let agent = &mut storage.agent;
 
-        base_agent::resume_agent(&mut agent.base, creator);
+        let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+        base_agent::resume_agent_by_addr(resource_addr, creator);
 
         // Update registry status
         agent_registry::update_agent_status(
-            base_agent::get_agent_id(&agent.base),
+            agent.agent_id,
             creator,
             true
         );
@@ -388,9 +401,10 @@ module recadence::dca_sell_agent {
 
         // Verify creator authorization
         let creator_addr = signer::address_of(creator);
-        assert!(base_agent::get_creator(&agent.base) == creator_addr, E_NOT_AUTHORIZED);
+        let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+        assert!(base_agent::get_agent_creator(resource_addr) == creator_addr, E_NOT_AUTHORIZED);
 
-        let agent_id = base_agent::get_agent_id(&agent.base);
+        let agent_id = agent.agent_id;
 
         // Withdraw all remaining funds
         let tokens_withdrawn = withdraw_tokens_from_agent(
@@ -402,7 +416,8 @@ module recadence::dca_sell_agent {
         let usdt_withdrawn = withdraw_usdt_from_agent(agent_resource_addr, creator_addr);
 
         // Mark agent as deleted
-        base_agent::delete_agent(&mut agent.base, creator);
+        let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+        base_agent::delete_agent_by_addr(resource_addr, creator);
 
         // Update registry status
         agent_registry::update_agent_status(agent_id, creator, false);
@@ -421,15 +436,18 @@ module recadence::dca_sell_agent {
     // Internal Functions
     // ================================================================================================
 
+
+
     /// Internal function to pause agent with reason
     fun pause_agent_internal(agent: &mut DCASellAgent, reason: vector<u8>) {
-        let old_state = base_agent::get_state(&agent.base);
+        let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+        let old_state = base_agent::get_agent_state(resource_addr);
         if (old_state == 1) { // Only pause if currently active
             // Note: We can't call base_agent::pause_agent here without a signer
             // This would need to be handled by the keeper system
             event::emit(DCASellAgentStoppedEvent {
-                agent_id: base_agent::get_agent_id(&agent.base),
-                creator: base_agent::get_creator(&agent.base),
+                agent_id: agent.agent_id,
+                creator: base_agent::get_agent_creator(resource_addr),
                 reason,
                 stopped_at: timestamp::now_seconds(),
             });
@@ -542,8 +560,11 @@ module recadence::dca_sell_agent {
         let agent = &storage.agent;
 
         (
-            base_agent::get_agent_id(&agent.base),
-            base_agent::get_creator(&agent.base),
+            agent.agent_id,
+            {
+                let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+                base_agent::get_agent_creator(resource_addr)
+            },
             object::object_address(&agent.source_token),
             agent.sell_amount_tokens,
             agent.timing.unit,
@@ -564,7 +585,8 @@ module recadence::dca_sell_agent {
         let storage = borrow_global<DCASellAgentStorage>(agent_resource_addr);
         let agent = &storage.agent;
 
-        if (!base_agent::is_active(&agent.base)) {
+        let resource_addr = agent_registry::get_agent_resource_address(agent.agent_id);
+        if (!base_agent::is_agent_active(resource_addr)) {
             return false
         };
 

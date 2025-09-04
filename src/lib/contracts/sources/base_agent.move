@@ -12,10 +12,11 @@
 module recadence::base_agent {
     use std::signer;
     use std::vector;
-    use std::option;
     use aptos_framework::event;
     use aptos_framework::timestamp;
     use aptos_framework::coin;
+    use aptos_framework::account;
+    use std::option::{Self, Option};
 
     // ================================================================================================
     // Error Codes
@@ -58,7 +59,7 @@ module recadence::base_agent {
     // ================================================================================================
 
     /// Base agent structure containing common fields for all agent types
-    struct BaseAgent has key, store, copy, drop {
+    struct BaseAgent has key, store {
         /// Unique agent ID
         id: u64,
         /// Address of the agent creator
@@ -77,6 +78,10 @@ module recadence::base_agent {
         reserved_funds: u64,
         /// Total transactions executed by this agent
         total_transactions: u64,
+        /// Resource address for this agent (optional, set after resource account creation)
+        resource_address: Option<address>,
+        /// Signer capability for agent operations (optional, retrieved when needed)
+        resource_signer_cap: Option<account::SignerCapability>,
     }
 
     /// User agent registry to track agent count and gas sponsorship
@@ -178,7 +183,7 @@ module recadence::base_agent {
         creator: &signer,
         name: vector<u8>,
         agent_type: vector<u8>
-    ): BaseAgent acquires UserAgentRegistry, PlatformRegistry {
+    ): (BaseAgent, signer) acquires UserAgentRegistry, PlatformRegistry {
         let creator_addr = signer::address_of(creator);
 
         // Ensure user registry exists
@@ -214,7 +219,11 @@ module recadence::base_agent {
 
         let current_time = timestamp::now_seconds();
 
-        // Create base agent
+        // Create resource account for this agent
+        let (resource_signer, signer_cap) = account::create_resource_account(creator, vector::empty<u8>());
+        let resource_addr = signer::address_of(&resource_signer);
+
+        // Create base agent with resource account info
         let base_agent = BaseAgent {
             id: agent_id,
             creator: creator_addr,
@@ -225,6 +234,8 @@ module recadence::base_agent {
             has_gas_sponsorship,
             reserved_funds: 0,
             total_transactions: 0,
+            resource_address: option::some(resource_addr),
+            resource_signer_cap: option::some(signer_cap),
         };
 
         // Emit events
@@ -245,7 +256,7 @@ module recadence::base_agent {
             });
         };
 
-        base_agent
+        (base_agent, resource_signer)
     }
 
     /// Pause an agent (can only be called by creator)
@@ -368,6 +379,135 @@ module recadence::base_agent {
     public fun get_total_transactions(agent: &BaseAgent): u64 {
         agent.total_transactions
     }
+
+
+
+    /// Get resource address for the agent
+    public fun get_resource_address(agent: &BaseAgent): address {
+        *option::borrow(&agent.resource_address)
+    }
+
+    /// Get signer capability for the agent
+    public fun get_signer_cap(agent: &BaseAgent): &account::SignerCapability {
+        option::borrow(&agent.resource_signer_cap)
+    }
+
+    /// Store BaseAgent in global storage (can only be called from within base_agent module)
+    public fun store_base_agent(resource_signer: &signer, base_agent: BaseAgent) {
+        move_to(resource_signer, base_agent);
+    }
+
+    /// Check if agent is active by resource address
+    public fun is_agent_active(resource_addr: address): bool acquires BaseAgent {
+        let base_agent = borrow_global<BaseAgent>(resource_addr);
+        base_agent.state == AGENT_STATE_ACTIVE
+    }
+
+    /// Get agent creator by resource address
+    public fun get_agent_creator(resource_addr: address): address acquires BaseAgent {
+        let base_agent = borrow_global<BaseAgent>(resource_addr);
+        base_agent.creator
+    }
+
+    /// Get agent state by resource address
+    public fun get_agent_state(resource_addr: address): u8 acquires BaseAgent {
+        let base_agent = borrow_global<BaseAgent>(resource_addr);
+        base_agent.state
+    }
+
+    /// Get agent ID by resource address
+    public fun get_agent_id_by_addr(resource_addr: address): u64 acquires BaseAgent {
+        let base_agent = borrow_global<BaseAgent>(resource_addr);
+        base_agent.id
+    }
+
+    /// Pause agent by resource address and creator
+    public fun pause_agent_by_addr(resource_addr: address, creator: &signer) acquires BaseAgent {
+        let base_agent = borrow_global_mut<BaseAgent>(resource_addr);
+        let creator_addr = signer::address_of(creator);
+        assert!(base_agent.creator == creator_addr, E_NOT_AUTHORIZED);
+        assert!(base_agent.state == AGENT_STATE_ACTIVE, E_AGENT_NOT_ACTIVE);
+
+        let old_state = base_agent.state;
+        base_agent.state = AGENT_STATE_PAUSED;
+        base_agent.updated_at = timestamp::now_seconds();
+
+        event::emit(AgentStateChangedEvent {
+            agent_id: base_agent.id,
+            creator: creator_addr,
+            old_state,
+            new_state: AGENT_STATE_PAUSED,
+            changed_at: base_agent.updated_at,
+        });
+    }
+
+    /// Resume agent by resource address and creator
+    public fun resume_agent_by_addr(resource_addr: address, creator: &signer) acquires BaseAgent {
+        let base_agent = borrow_global_mut<BaseAgent>(resource_addr);
+        let creator_addr = signer::address_of(creator);
+        assert!(base_agent.creator == creator_addr, E_NOT_AUTHORIZED);
+        assert!(base_agent.state == AGENT_STATE_PAUSED, E_AGENT_NOT_PAUSED);
+
+        let old_state = base_agent.state;
+        base_agent.state = AGENT_STATE_ACTIVE;
+        base_agent.updated_at = timestamp::now_seconds();
+
+        event::emit(AgentStateChangedEvent {
+            agent_id: base_agent.id,
+            creator: creator_addr,
+            old_state,
+            new_state: AGENT_STATE_ACTIVE,
+            changed_at: base_agent.updated_at,
+        });
+    }
+
+    /// Increment transaction count by resource address
+    public fun increment_transaction_count_by_addr(resource_addr: address) acquires BaseAgent {
+        let base_agent = borrow_global_mut<BaseAgent>(resource_addr);
+        base_agent.total_transactions = base_agent.total_transactions + 1;
+        base_agent.updated_at = timestamp::now_seconds();
+    }
+
+    /// Get total transactions by resource address
+    public fun get_total_transactions_by_addr(resource_addr: address): u64 acquires BaseAgent {
+        let base_agent = borrow_global<BaseAgent>(resource_addr);
+        base_agent.total_transactions
+    }
+
+    /// Delete agent by resource address and creator
+    public fun delete_agent_by_addr(resource_addr: address, creator: &signer)
+        acquires BaseAgent, UserAgentRegistry, PlatformRegistry {
+        let base_agent = borrow_global_mut<BaseAgent>(resource_addr);
+        let creator_addr = signer::address_of(creator);
+        assert!(base_agent.creator == creator_addr, E_NOT_AUTHORIZED);
+        assert!(base_agent.state != AGENT_STATE_DELETED, E_INVALID_STATE_TRANSITION);
+
+        let agent_id = base_agent.id;
+        let old_state = base_agent.state;
+        base_agent.state = AGENT_STATE_DELETED;
+        base_agent.updated_at = timestamp::now_seconds();
+
+        // Update user registry
+        if (exists<UserAgentRegistry>(creator_addr)) {
+            let user_registry = borrow_global_mut<UserAgentRegistry>(creator_addr);
+            user_registry.active_agent_count = user_registry.active_agent_count - 1;
+        };
+
+        // Update platform registry
+        if (exists<PlatformRegistry>(@recadence)) {
+            let platform_registry = borrow_global_mut<PlatformRegistry>(@recadence);
+            platform_registry.total_active_agents = platform_registry.total_active_agents - 1;
+        };
+
+        // Emit event
+        event::emit(AgentDeletedEvent {
+            agent_id,
+            creator: creator_addr,
+            deleted_at: base_agent.updated_at,
+        });
+    }
+
+
 
     // ================================================================================================
     // View Functions

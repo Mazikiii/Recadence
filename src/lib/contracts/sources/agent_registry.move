@@ -122,6 +122,14 @@ module recadence::agent_registry {
     }
 
     #[event]
+    struct AgentUnregisteredEvent has drop, store {
+        agent_id: u64,
+        creator: address,
+        agent_type: vector<u8>,
+        unregistered_at: u64,
+    }
+
+    #[event]
     struct AgentTypeRegisteredEvent has drop, store {
         type_name: vector<u8>,
         description: vector<u8>,
@@ -239,8 +247,7 @@ module recadence::agent_registry {
         creator: &signer,
         agent_type: vector<u8>,
         name: vector<u8>,
-        resource_account: address,
-        base_agent: &BaseAgent
+        resource_account: address
     ) acquires AgentRegistry {
         let creator_addr = signer::address_of(creator);
         let registry = borrow_global_mut<AgentRegistry>(@recadence);
@@ -249,7 +256,7 @@ module recadence::agent_registry {
         assert!(table::contains(&registry.agent_types, agent_type), E_UNSUPPORTED_AGENT_TYPE);
         assert!(is_agent_type_enabled(agent_type, registry), E_UNSUPPORTED_AGENT_TYPE);
 
-        let agent_id = base_agent::get_agent_id(base_agent);
+        let agent_id = base_agent::get_agent_id_by_addr(resource_account);
         let current_time = timestamp::now_seconds();
 
         // Create registry entry
@@ -260,7 +267,7 @@ module recadence::agent_registry {
             name,
             resource_account,
             registered_at: current_time,
-            is_active: base_agent::is_active(base_agent),
+            is_active: base_agent::is_agent_active(resource_account),
             total_transactions: 0,
         };
 
@@ -280,14 +287,14 @@ module recadence::agent_registry {
 
         // Update counters
         registry.total_agents = registry.total_agents + 1;
-        if (base_agent::is_active(base_agent)) {
+        if (base_agent::is_agent_active(resource_account)) {
             registry.total_active = registry.total_active + 1;
         };
 
         // Update agent type counters
         let type_info = table::borrow_mut(&mut registry.agent_types, agent_type);
         type_info.total_count = type_info.total_count + 1;
-        if (base_agent::is_active(base_agent)) {
+        if (base_agent::is_agent_active(resource_account)) {
             type_info.active_count = type_info.active_count + 1;
         };
 
@@ -299,6 +306,64 @@ module recadence::agent_registry {
             name,
             resource_account,
             registered_at: current_time,
+        });
+    }
+
+    /// Unregister an agent from the registry (for deletion)
+    public fun unregister_agent(agent_id: u64, creator: &signer) acquires AgentRegistry {
+        let creator_addr = signer::address_of(creator);
+        let registry = borrow_global_mut<AgentRegistry>(@recadence);
+
+        assert!(table::contains(&registry.agents, agent_id), E_AGENT_NOT_FOUND);
+
+        let entry = table::borrow(&registry.agents, agent_id);
+        assert!(entry.creator == creator_addr, E_NOT_AUTHORIZED);
+
+        let agent_type = entry.agent_type;
+        let was_active = entry.is_active;
+
+        // Remove from main agents table
+        table::remove(&mut registry.agents, agent_id);
+
+        // Remove from creator's agent list
+        if (table::contains(&registry.agents_by_creator, creator_addr)) {
+            let creator_agents = table::borrow_mut(&mut registry.agents_by_creator, creator_addr);
+            let (found, index) = vector::index_of(creator_agents, &agent_id);
+            if (found) {
+                vector::remove(creator_agents, index);
+            };
+        };
+
+        // Remove from agent type list
+        if (table::contains(&registry.agents_by_type, agent_type)) {
+            let type_agents = table::borrow_mut(&mut registry.agents_by_type, agent_type);
+            let (found, index) = vector::index_of(type_agents, &agent_id);
+            if (found) {
+                vector::remove(type_agents, index);
+            };
+        };
+
+        // Update counters
+        registry.total_agents = registry.total_agents - 1;
+        if (was_active) {
+            registry.total_active = registry.total_active - 1;
+        };
+
+        // Update agent type counters
+        if (table::contains(&registry.agent_types, agent_type)) {
+            let type_info = table::borrow_mut(&mut registry.agent_types, agent_type);
+            type_info.total_count = type_info.total_count - 1;
+            if (was_active) {
+                type_info.active_count = type_info.active_count - 1;
+            };
+        };
+
+        // Emit event
+        event::emit(AgentUnregisteredEvent {
+            agent_id,
+            creator: creator_addr,
+            agent_type,
+            unregistered_at: timestamp::now_seconds(),
         });
     }
 
@@ -401,6 +466,15 @@ module recadence::agent_registry {
             entry.is_active,
             entry.total_transactions
         )
+    }
+
+    #[view]
+    /// Get agent resource address by agent ID
+    public fun get_agent_resource_address(agent_id: u64): address acquires AgentRegistry {
+        let registry = borrow_global<AgentRegistry>(@recadence);
+        assert!(table::contains(&registry.agents, agent_id), E_AGENT_NOT_FOUND);
+        let entry = table::borrow(&registry.agents, agent_id);
+        entry.resource_account
     }
 
     #[view]
