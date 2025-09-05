@@ -173,7 +173,7 @@ module recadence::dca_buy_agent {
     // Agent Creation
     // ================================================================================================
 
-    /// Create a new DCA Buy agent
+    /// Create DCA Buy agent
     public entry fun create_dca_buy_agent(
         creator: &signer,
         target_token: Object<Metadata>,
@@ -520,6 +520,77 @@ module recadence::dca_buy_agent {
         token_addr == USDC_TOKEN ||
         token_addr == USDT_TOKEN
     }
+
+    /// Test-only version that accepts any valid Metadata object for testing
+    #[test_only]
+    fun is_supported_token_test(token: Object<Metadata>): bool {
+        // In test environment, accept any properly formed Metadata object
+        true
+    }
+
+
+    /// Test-only version of create_dca_buy_agent that bypasses token validation
+    #[test_only]
+    public fun create_dca_buy_agent_for_testing(
+        creator: &signer,
+        target_token: Object<Metadata>,
+        buy_amount_usdt: u64,
+        timing_unit: u8,
+        timing_value: u64,
+        initial_usdt_deposit: u64,
+        stop_date: Option<u64>,
+        agent_name: vector<u8>
+    ) {
+        // Validate inputs (skip token validation for testing)
+        assert!(is_valid_timing(timing_unit, timing_value), E_NOT_TIME_FOR_EXECUTION);
+        assert!(buy_amount_usdt > 0, E_INSUFFICIENT_USDT_BALANCE);
+        assert!(initial_usdt_deposit >= buy_amount_usdt, E_INSUFFICIENT_USDT_BALANCE);
+
+        // Create base agent
+        let (base_agent, resource_signer) = base_agent::create_base_agent(
+            creator,
+            agent_name,
+            b"dca_buy"
+        );
+
+        // Create timing configuration
+        let timing_config = TimingConfig {
+            unit: timing_unit,
+            value: timing_value,
+        };
+
+        let agent_id = base_agent::get_agent_id(&base_agent);
+
+        // Create DCA Buy Agent
+        let dca_agent = DCABuyAgent {
+            agent_id,
+            target_token,
+            buy_amount_usdt,
+            timing: timing_config,
+            last_execution: 0,
+            stop_date,
+            total_purchased: 0,
+            total_usdt_spent: 0,
+            remaining_usdt: initial_usdt_deposit,
+            average_price: 0,
+            execution_count: 0,
+        };
+
+        // Store the agent
+        let agent_storage = DCABuyAgentStorage {
+            agent: dca_agent,
+        };
+
+        // Store base agent in resource account first
+        base_agent::store_base_agent(&resource_signer, base_agent);
+
+        // Then store agent storage
+        move_to(&resource_signer, agent_storage);
+
+        // Transfer initial USDT deposit to the agent (TODO: implement)
+        // transfer_usdt_to_agent(creator, resource_addr, initial_usdt_deposit);
+    }
+
 
     // ================================================================================================
     // View Functions

@@ -496,6 +496,13 @@ module recadence::percentage_buy_agent {
         token_addr == USDT_TOKEN
     }
 
+    /// Test-only version that accepts any valid Metadata object for testing
+    #[test_only]
+    fun is_supported_token_test(token: Object<Metadata>): bool {
+        // In test environment, accept any properly formed Metadata object
+        true
+    }
+
     // ================================================================================================
     // View Functions
     // ================================================================================================
@@ -586,6 +593,66 @@ module recadence::percentage_buy_agent {
     // ================================================================================================
     // Test Functions (dev only)
     // ================================================================================================
+
+    /// Test-only version of create_percentage_buy_agent that bypasses token validation
+    #[test_only]
+    public fun create_percentage_buy_agent_for_testing(
+        creator: &signer,
+        target_token: Object<Metadata>,
+        buy_amount_usdt: u64,
+        percentage_threshold: u64,
+        trend_direction: u8,
+        initial_price: u64,
+        initial_usdt_deposit: u64,
+        stop_date: Option<u64>,
+        agent_name: vector<u8>
+    ) {
+        // Validate inputs (skip token validation for testing)
+        assert!(buy_amount_usdt > 0, E_INSUFFICIENT_USDT_BALANCE);
+        assert!(percentage_threshold >= 100 && percentage_threshold <= 5000, E_INVALID_PERCENTAGE);
+        assert!(trend_direction <= 1, E_INVALID_TREND);
+        assert!(initial_usdt_deposit >= buy_amount_usdt, E_INSUFFICIENT_USDT_BALANCE);
+
+        // Create base agent
+        let (base_agent, resource_signer) = base_agent::create_base_agent(
+            creator,
+            agent_name,
+            b"percentage_buy"
+        );
+
+        let agent_id = base_agent::get_agent_id(&base_agent);
+
+        // Create Percentage Buy Agent
+        let percentage_agent = PercentageBuyAgent {
+            agent_id,
+            target_token,
+            buy_amount_usdt,
+            percentage_threshold,
+            trend_direction,
+            last_price: initial_price,
+            last_price_check: timestamp::now_seconds(),
+            stop_date,
+            total_purchased: 0,
+            total_usdt_spent: 0,
+            remaining_usdt: initial_usdt_deposit,
+            average_price: 0,
+            execution_count: 0,
+        };
+
+        // Store the agent
+        let agent_storage = PercentageBuyAgentStorage {
+            agent: percentage_agent,
+        };
+
+        // Store base agent in resource account first
+        base_agent::store_base_agent(&resource_signer, base_agent);
+
+        // Then store agent storage
+        move_to(&resource_signer, agent_storage);
+
+        // Transfer initial USDT deposit to the agent (TODO: implement)
+        // transfer_usdt_to_agent(creator, resource_addr, initial_usdt_deposit);
+    }
 
     #[test_only]
     public fun test_create_percentage_buy_agent(

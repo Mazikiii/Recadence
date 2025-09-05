@@ -535,6 +535,13 @@ module recadence::dca_sell_agent {
         token_addr == USDT_TOKEN
     }
 
+    /// Test-only version that accepts any valid Metadata object for testing
+    #[test_only]
+    fun is_supported_token_test(token: Object<Metadata>): bool {
+        // In test environment, accept any properly formed Metadata object
+        true
+    }
+
     // ================================================================================================
     // View Functions
     // ================================================================================================
@@ -669,6 +676,68 @@ module recadence::dca_sell_agent {
     // ================================================================================================
     // Test Functions (dev only)
     // ================================================================================================
+
+    /// Test-only version of create_dca_sell_agent that bypasses token validation
+    #[test_only]
+    public fun create_dca_sell_agent_for_testing(
+        creator: &signer,
+        source_token: Object<Metadata>,
+        sell_amount_tokens: u64,
+        timing_unit: u8,
+        timing_value: u64,
+        initial_token_deposit: u64,
+        stop_date: Option<u64>,
+        agent_name: vector<u8>
+    ) {
+        // Validate inputs (skip token validation for testing)
+        assert!(is_valid_timing(timing_unit, timing_value), E_NOT_TIME_FOR_EXECUTION);
+        assert!(sell_amount_tokens > 0, E_INSUFFICIENT_TOKEN_BALANCE);
+        assert!(initial_token_deposit >= sell_amount_tokens, E_INSUFFICIENT_TOKEN_BALANCE);
+
+        // Create base agent
+        let (base_agent, resource_signer) = base_agent::create_base_agent(
+            creator,
+            agent_name,
+            b"dca_sell"
+        );
+
+        // Create timing configuration
+        let timing_config = TimingConfig {
+            unit: timing_unit,
+            value: timing_value,
+        };
+
+        let agent_id = base_agent::get_agent_id(&base_agent);
+
+        // Create DCA Sell Agent
+        let dca_agent = DCASellAgent {
+            agent_id,
+            source_token,
+            sell_amount_tokens,
+            timing: timing_config,
+            last_execution: 0,
+            stop_date,
+            total_sold: 0,
+            total_usdt_received: 0,
+            remaining_tokens: initial_token_deposit,
+            average_price: 0,
+            execution_count: 0,
+        };
+
+        // Store the agent
+        let agent_storage = DCASellAgentStorage {
+            agent: dca_agent,
+        };
+
+        // Store base agent in resource account first
+        base_agent::store_base_agent(&resource_signer, base_agent);
+
+        // Then store agent storage
+        move_to(&resource_signer, agent_storage);
+
+        // Transfer initial tokens to the agent (TODO: implement)
+        // transfer_tokens_to_agent(creator, resource_addr, initial_token_deposit);
+    }
 
     #[test_only]
     public fun test_create_dca_sell_agent(

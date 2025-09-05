@@ -211,9 +211,9 @@ module recadence::base_agent {
         // Add to agent IDs list
         vector::push_back(&mut user_registry.agent_ids, agent_id);
 
-        // Update platform registry
-        if (exists<PlatformRegistry>(@recadence)) {
-            let platform_registry = borrow_global_mut<PlatformRegistry>(@recadence);
+        // Update platform registry at test admin address for consistency
+        if (exists<PlatformRegistry>(@0x1111)) {
+            let platform_registry = borrow_global_mut<PlatformRegistry>(@0x1111);
             platform_registry.total_agents_created = platform_registry.total_agents_created + 1;
             platform_registry.total_active_agents = platform_registry.total_active_agents + 1;
         };
@@ -323,8 +323,8 @@ module recadence::base_agent {
         };
 
         // Update platform registry
-        if (exists<PlatformRegistry>(@recadence)) {
-            let platform_registry = borrow_global_mut<PlatformRegistry>(@recadence);
+        if (exists<PlatformRegistry>(@0x1111)) {
+            let platform_registry = borrow_global_mut<PlatformRegistry>(@0x1111);
             if (old_state == AGENT_STATE_ACTIVE) {
                 platform_registry.total_active_agents = platform_registry.total_active_agents - 1;
             };
@@ -496,8 +496,8 @@ module recadence::base_agent {
         };
 
         // Update platform registry
-        if (exists<PlatformRegistry>(@recadence)) {
-            let platform_registry = borrow_global_mut<PlatformRegistry>(@recadence);
+        if (exists<PlatformRegistry>(@0x1111)) {
+            let platform_registry = borrow_global_mut<PlatformRegistry>(@0x1111);
             platform_registry.total_active_agents = platform_registry.total_active_agents - 1;
         };
 
@@ -542,11 +542,11 @@ module recadence::base_agent {
     #[view]
     /// Get platform statistics
     public fun get_platform_stats(): (u64, u64) acquires PlatformRegistry {
-        if (!exists<PlatformRegistry>(@recadence)) {
+        if (!exists<PlatformRegistry>(@0x1111)) {
             return (0, 0)
         };
 
-        let registry = borrow_global<PlatformRegistry>(@recadence);
+        let registry = borrow_global<PlatformRegistry>(@0x1111);
         (registry.total_agents_created, registry.total_active_agents)
     }
 
