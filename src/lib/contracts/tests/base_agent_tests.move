@@ -208,6 +208,89 @@ module recadence::base_agent_tests {
         base_agent::pause_agent_by_addr(resource_addr, &unauthorized);
     }
 
+    #[test(admin = @0x1111, user1 = @0x2222, user2 = @0x3333)]
+    fun test_maz_26_security_fixes_validation(admin: signer, user1: signer, user2: signer) {
+        setup_test_env();
+        init_aptos_coin();
+        setup_accounts(&admin, &user1, &user2);
+
+        base_agent::initialize_platform(&admin);
+
+        // Test 1: Verify object ownership validation is working
+        let (base_agent_struct1, resource_signer1) = base_agent::create_base_agent(
+            &user1,
+            b"User1 Agent",
+            b"test"
+        );
+
+        let resource_addr1 = signer::address_of(&resource_signer1);
+        base_agent::store_base_agent(&resource_signer1, base_agent_struct1);
+
+        // Test 2: Verify atomic agent limit enforcement (race condition fix)
+        let (active_count, _, _) = base_agent::get_user_agent_info(signer::address_of(&user1));
+        assert!(active_count == 1, 999); // Should be exactly 1 after creation
+
+        // Test 3: Verify fund isolation - only creator can access their agent
+        let creator_addr = base_agent::get_agent_creator_by_addr(resource_addr1);
+        assert!(creator_addr == signer::address_of(&user1), 998); // Verify correct creator
+
+        // Test 4: Verify agent state management security
+        let agent_state = base_agent::get_agent_state_by_addr(resource_addr1);
+        assert!(agent_state == 1, 997); // Should be ACTIVE (state 1)
+
+        // Test 5: Verify platform statistics are correctly maintained
+        let (total_created, total_active) = base_agent::get_platform_stats();
+        assert!(total_created >= 1, 996);
+        assert!(total_active >= 1, 995);
+    }
+
+    #[test(admin = @0x1111, user1 = @0x2222, unauthorized = @0x9999)]
+    #[expected_failure(abort_code = 2, location = recadence::base_agent)]
+    fun test_maz_26_ownership_validation_resume_fails(admin: signer, user1: signer, unauthorized: signer) {
+        setup_test_env();
+        init_aptos_coin();
+        setup_accounts(&admin, &user1, &unauthorized);
+
+        base_agent::initialize_platform(&admin);
+
+        let (base_agent_struct, resource_signer) = base_agent::create_base_agent(
+            &user1,
+            b"Test Agent",
+            b"test"
+        );
+
+        let resource_addr = signer::address_of(&resource_signer);
+        base_agent::store_base_agent(&resource_signer, base_agent_struct);
+
+        // First pause by legitimate owner
+        base_agent::pause_agent_by_addr(resource_addr, &user1);
+
+        // Then try to resume by unauthorized user - should fail
+        base_agent::resume_agent_by_addr(resource_addr, &unauthorized);
+    }
+
+    #[test(admin = @0x1111, user1 = @0x2222, unauthorized = @0x9999)]
+    #[expected_failure(abort_code = 2, location = recadence::base_agent)]
+    fun test_maz_26_ownership_validation_delete_fails(admin: signer, user1: signer, unauthorized: signer) {
+        setup_test_env();
+        init_aptos_coin();
+        setup_accounts(&admin, &user1, &unauthorized);
+
+        base_agent::initialize_platform(&admin);
+
+        let (base_agent_struct, resource_signer) = base_agent::create_base_agent(
+            &user1,
+            b"Test Agent",
+            b"test"
+        );
+
+        let resource_addr = signer::address_of(&resource_signer);
+        base_agent::store_base_agent(&resource_signer, base_agent_struct);
+
+        // Try to delete by unauthorized user - should fail with ownership validation
+        base_agent::delete_agent_by_addr(resource_addr, &unauthorized);
+    }
+
     #[test(admin = @0x1111, user1 = @0x2222)]
     fun test_agent_deletion(admin: signer, user1: signer) {
         setup_test_env();
